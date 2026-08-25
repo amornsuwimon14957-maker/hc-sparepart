@@ -36,22 +36,28 @@
     .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center; }
     .modal-content { background: #fff; width: 85%; max-width: 400px; padding: 20px; border-radius: 12px; text-align: center; box-shadow: 0 5px 15px rgba(0,0,0,0.3); animation: popIn 0.2s ease-out; }
     @keyframes popIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-    .modal-icon { font-size: 3em; margin-bottom: 5px; }
     .modal-title { font-size: 1.3em; font-weight: bold; color: #28a745; margin-bottom: 5px; }
-    .modal-item-name { font-size: 1.15em; font-weight: bold; color: #000; margin: 10px 0; background: #f8f9fa; padding: 10px; border-radius: 6px; border: 1px solid #ddd; }
+    .modal-img-container { width: 100%; height: 180px; margin: 10px 0; border-radius: 8px; overflow: hidden; border: 1px solid #ddd; background: #fafafa; display: flex; align-items: center; justify-content: center; }
+    .modal-img-container img { max-width: 100%; max-height: 100%; object-fit: contain; }
+    .modal-item-name { font-size: 1.1em; font-weight: bold; color: #000; margin-bottom: 5px; }
     .btn-modal-action { background: #007bff; color: white; margin-top: 8px; }
     .btn-modal-close { background: #6c757d; color: white; margin-top: 6px; }
   </style>
 </head>
 <body>
 
-  <!-- Modal ป็อปอัพแจ้งเตือนเมื่อสแกนติด -->
+  <!-- Modal ป็อปอัพแสดงข้อมูลพร้อมรูปภาพ -->
   <div id="scanModal" class="modal-overlay">
     <div class="modal-content">
-      <div class="modal-icon">🔔</div>
-      <div class="modal-title">สแกนบาร์โค้ดสำเร็จ!</div>
+      <div class="modal-title">🔔 สแกนสำเร็จ!</div>
+      
+      <!-- แสดงรูปภาพอะไหล่ -->
+      <div class="modal-img-container">
+        <img id="modalImg" src="" alt="รูปอะไหล่">
+      </div>
+      
       <div id="modalItemName" class="modal-item-name">-</div>
-      <p style="color:#555; font-size:0.95em; margin-bottom:15px;">เลือกขั้นตอนถัดไปที่ต้องการดำเนินการ:</p>
+      <p style="color:#555; font-size:0.9em; margin-bottom:12px;">เลือกขั้นตอนถัดไปที่ต้องการดำเนินการ:</p>
       <button class="btn-modal-action" onclick="focusRequesterInput()">✏️ ระบุชื่อผู้เบิก / จำนวน</button>
       <button class="btn-modal-close" onclick="closeModal()">📷 สแกนรายการอื่นใหม่</button>
     </div>
@@ -117,28 +123,53 @@
   </div>
 
   <script>
-    // ปรับปรุงรายการสินค้าเริ่มต้นเป็น 95 sq.mm.
+    // เพิ่ม URL รูปภาพเข้าไปในข้อมูลสต็อก
     const INITIAL_STOCK = {
-      "HC-0001": { name: "หางปลา 50 sq.mm.", quantity: 10 },
-      "HC-0002": { name: "หางปลา 95 sq.mm.", quantity: 10 }
+      "HC-0001": { 
+        name: "หางปลา 50 sq.mm.", 
+        quantity: 10,
+        image: "https://i.postimg.cc/GtPKPwbr/k5a38u.jpg"
+      },
+      "HC-0002": { 
+        name: "หางปลา 95 sq.mm.", 
+        quantity: 10,
+        image: "https://i.postimg.cc/qMjXpGRv/qy3dsz.jpg"
+      }
     };
 
-    const DB_KEY = 'SPARE_PARTS_DB_V10';
-    const LOG_KEY = 'SPARE_PARTS_LOG_V10';
+    const DB_KEY = 'SPARE_PARTS_DB_V11';
+    const LOG_KEY = 'SPARE_PARTS_LOG_V11';
     let lastScannedCode = "";
 
-    function playBeepSound() {
+    // เล่นเสียงกระดิ่ง (Bell / Chime) 2 โทนเสียง
+    function playBellSound() {
       try {
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.type = "sine";
-        osc.frequency.setValueAtTime(880, audioCtx.currentTime);
-        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.start();
-        osc.stop(audioCtx.currentTime + 0.15);
+        
+        // เสียงกระดิ่ง ตัวที่ 1 (High tone)
+        const osc1 = audioCtx.createOscillator();
+        const gain1 = audioCtx.createGain();
+        osc1.type = "sine";
+        osc1.frequency.setValueAtTime(987.77, audioCtx.currentTime); // Note B5
+        gain1.gain.setValueAtTime(0.15, audioCtx.currentTime);
+        gain1.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+        osc1.connect(gain1);
+        gain1.connect(audioCtx.destination);
+        osc1.start(audioCtx.currentTime);
+        osc1.stop(audioCtx.currentTime + 0.3);
+
+        // เสียงกระดิ่ง ตัวที่ 2 (Higher tone - Chime)
+        const osc2 = audioCtx.createOscillator();
+        const gain2 = audioCtx.createGain();
+        osc2.type = "sine";
+        osc2.frequency.setValueAtTime(1318.51, audioCtx.currentTime + 0.1); // Note E6
+        gain2.gain.setValueAtTime(0.15, audioCtx.currentTime + 0.1);
+        gain2.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
+        osc2.connect(gain2);
+        gain2.connect(audioCtx.destination);
+        osc2.start(audioCtx.currentTime + 0.1);
+        osc2.stop(audioCtx.currentTime + 0.5);
+
       } catch (e) {
         console.log("Audio play error", e);
       }
@@ -185,8 +216,9 @@
       }
     }
 
-    function showScanModal(code, itemName) {
-      document.getElementById('modalItemName').innerHTML = `<b>${itemName}</b><br><small style="color:#666;">[${code}]</small>`;
+    function showScanModal(code, item) {
+      document.getElementById('modalImg').src = item.image || '';
+      document.getElementById('modalItemName').innerHTML = `<b>${item.name}</b><br><small style="color:#666;">[${code}]</small>`;
       document.getElementById('scanModal').style.display = 'flex';
     }
 
@@ -214,8 +246,8 @@
 
         if (code !== lastScannedCode) {
           lastScannedCode = code;
-          playBeepSound();
-          showScanModal(code, db[code].name);
+          playBellSound();
+          showScanModal(code, db[code]);
         }
       } else {
         dispName.innerText = code ? `❌ ไม่พบรหัส "${code}" ในสต็อก` : 'กรุณาสแกนหรือพิมพ์บาร์โค้ด';
