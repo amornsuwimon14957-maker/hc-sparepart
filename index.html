@@ -19,7 +19,6 @@
     button { background: #007bff; color: white; border: none; font-weight: bold; cursor: pointer; }
     button:active { opacity: 0.8; }
 
-    .btn-quick { background: #6c757d; font-size: 0.85em; padding: 8px; margin-top: 5px; width: 48%; display: inline-block; }
     .btn-withdraw { background: #28a745; font-size: 1.1em; margin-top: 15px; }
     .btn-reset { background: #dc3545; font-size: 0.85em; padding: 8px; margin-top: 15px; }
     .btn-clear-history { background: #ffc107; color: #000; font-size: 0.85em; padding: 6px; margin-top: 10px; }
@@ -32,26 +31,42 @@
     th, td { border: 1px solid #eee; padding: 8px; text-align: left; }
     th { background-color: #f8f9fa; }
     .table-container { max-height: 220px; overflow-y: auto; border: 1px solid #eee; border-radius: 6px; }
+
+    /* Modal / Popup Style */
+    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center; }
+    .modal-content { background: #fff; width: 85%; max-width: 400px; padding: 20px; border-radius: 12px; text-align: center; box-shadow: 0 5px 15px rgba(0,0,0,0.3); animation: popIn 0.2s ease-out; }
+    @keyframes popIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    .modal-icon { font-size: 3em; margin-bottom: 5px; }
+    .modal-title { font-size: 1.3em; font-weight: bold; color: #28a745; margin-bottom: 5px; }
+    .modal-item-name { font-size: 1.15em; font-weight: bold; color: #000; margin: 10px 0; background: #f8f9fa; padding: 10px; border-radius: 6px; border: 1px solid #ddd; }
+    .btn-modal-action { background: #007bff; color: white; margin-top: 8px; }
+    .btn-modal-close { background: #6c757d; color: white; margin-top: 6px; }
   </style>
 </head>
 <body>
 
+  <!-- Modal ป็อปอัพแจ้งเตือนเมื่อสแกนติด -->
+  <div id="scanModal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-icon">🔔</div>
+      <div class="modal-title">สแกนบาร์โค้ดสำเร็จ!</div>
+      <div id="modalItemName" class="modal-item-name">-</div>
+      <p style="color:#555; font-size:0.95em; margin-bottom:15px;">เลือกขั้นตอนถัดไปที่ต้องการดำเนินการ:</p>
+      <button class="btn-modal-action" onclick="focusRequesterInput()">✏️ ระบุชื่อผู้เบิก / จำนวน</button>
+      <button class="btn-modal-close" onclick="closeModal()">📷 สแกนรายการอื่นใหม่</button>
+    </div>
+  </div>
+
   <div class="card">
     <h2 style="margin-top:0;">📱 สแกนเบิกอะไหล่</h2>
     <div id="reader"></div>
-    
-    <div style="margin-top: 10px;">
-      <small style="color: #666;">ทดสอบเลือกอะไหล่:</small><br>
-      <button class="btn-quick" onclick="testCode('HC-0001')">HC-0001 (50 sq.mm.)</button>
-      <button class="btn-quick" onclick="testCode('HC-0002')">HC-0002 (100 sq.mm.)</button>
-    </div>
 
     <label style="margin-top:15px; display:block; font-weight:bold;">1. Barcode รหัสอะไหล่:</label>
-    <input type="text" id="barcode" placeholder="พิมพ์รหัส เช่น HC-0001" onkeyup="onBarcodeChange()" onchange="onBarcodeChange()">
+    <input type="text" id="barcode" placeholder="พิมพ์รหัส หรือสแกนผ่านกล้อง" onkeyup="onBarcodeChange()" onchange="onBarcodeChange()">
 
     <div class="info-box">
       <h3>📦 ข้อมูลอะไหล่ที่เลือก</h3>
-      <div class="info-item"><b>ชื่อรายการ:</b> <span id="disp-name" style="color: #888;">กรุณาสแกนหรือเลือกบาร์โค้ด</span></div>
+      <div class="info-item"><b>ชื่อรายการ:</b> <span id="disp-name" style="color: #888;">กรุณาสแกนหรือพิมพ์บาร์โค้ด</span></div>
       <div class="info-item"><b>คงเหลือก่อนเบิก:</b> <span id="disp-qty" class="qty-badge">-</span> ชิ้น</div>
     </div>
 
@@ -107,8 +122,27 @@
       "HC-0002": { name: "หางปลา 100 sq.mm.", quantity: 10 }
     };
 
-    const DB_KEY = 'SPARE_PARTS_DB_V8';
-    const LOG_KEY = 'SPARE_PARTS_LOG_V8';
+    const DB_KEY = 'SPARE_PARTS_DB_V9';
+    const LOG_KEY = 'SPARE_PARTS_LOG_V9';
+    let lastScannedCode = "";
+
+    // เล่นเสียงบี๊บแจ้งเตือนเมื่อสแกนติด
+    function playBeepSound() {
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(880, audioCtx.currentTime); // ความถี่เสียง 880Hz (เสียง Beep สดใส)
+        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.15); // เล่นเสียงยาว 0.15 วินาที
+      } catch (e) {
+        console.log("Audio play error", e);
+      }
+    }
 
     function loadDB() {
       let data = localStorage.getItem(DB_KEY);
@@ -151,9 +185,18 @@
       }
     }
 
-    function testCode(code) {
-      document.getElementById('barcode').value = code;
-      onBarcodeChange();
+    function showScanModal(code, itemName) {
+      document.getElementById('modalItemName').innerHTML = `<b>${itemName}</b><br><small style="color:#666;">[${code}]</small>`;
+      document.getElementById('scanModal').style.display = 'flex';
+    }
+
+    function closeModal() {
+      document.getElementById('scanModal').style.display = 'none';
+    }
+
+    function focusRequesterInput() {
+      closeModal();
+      document.getElementById('requester').focus();
     }
 
     function onBarcodeChange() {
@@ -168,10 +211,18 @@
         dispName.innerText = db[code].name;
         dispName.style.color = '#000';
         dispQty.innerText = db[code].quantity;
+
+        // ถ้าเป็นรหัสใหม่ ให้เล่นเสียงและขึ้นป็อปอัพ
+        if (code !== lastScannedCode) {
+          lastScannedCode = code;
+          playBeepSound();
+          showScanModal(code, db[code].name);
+        }
       } else {
-        dispName.innerText = code ? `❌ ไม่พบรหัส "${code}" ในสต็อก` : 'กรุณาสแกนหรือเลือกบาร์โค้ด';
+        dispName.innerText = code ? `❌ ไม่พบรหัส "${code}" ในสต็อก` : 'กรุณาสแกนหรือพิมพ์บาร์โค้ด';
         dispName.style.color = code ? '#d9534f' : '#888';
         dispQty.innerText = '-';
+        lastScannedCode = "";
       }
     }
 
@@ -189,11 +240,9 @@
       if (!db[code]) return showResult(`🚫 ไม่พบรหัสบาร์โค้ด "${code}" ในระบบ`, false);
       if (db[code].quantity < withdrawQty) return showResult(`❌ สินค้าไม่พอ! คงเหลือเพียง ${db[code].quantity} ชิ้น`, false);
 
-      // 1. ตัดสต็อก
       db[code].quantity -= withdrawQty;
       saveDB(db);
 
-      // 2. บันทึกประวัติ (Log)
       const history = loadHistory();
       const now = new Date();
       const timeStr = `${now.getDate()}/${now.getMonth()+1}/${now.getFullYear()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
@@ -209,6 +258,7 @@
       showResult(`✅ ตัดยอดสำเร็จ!<br>ผู้เบิก: <b>${requester}</b><br>${db[code].name} (${withdrawQty} ชิ้น)<br><b>คงเหลือใหม่: ${db[code].quantity} ชิ้น</b>`, true);
       document.getElementById('disp-qty').innerText = db[code].quantity;
       qtyInput.value = 1;
+      lastScannedCode = "";
     }
 
     function showResult(msg, isSuccess) {
