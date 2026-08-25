@@ -117,28 +117,28 @@
   </div>
 
   <script>
+    // ปรับปรุงรายการสินค้าเริ่มต้นเป็น 95 sq.mm.
     const INITIAL_STOCK = {
       "HC-0001": { name: "หางปลา 50 sq.mm.", quantity: 10 },
-      "HC-0002": { name: "หางปลา 100 sq.mm.", quantity: 10 }
+      "HC-0002": { name: "หางปลา 95 sq.mm.", quantity: 10 }
     };
 
-    const DB_KEY = 'SPARE_PARTS_DB_V9';
-    const LOG_KEY = 'SPARE_PARTS_LOG_V9';
+    const DB_KEY = 'SPARE_PARTS_DB_V10';
+    const LOG_KEY = 'SPARE_PARTS_LOG_V10';
     let lastScannedCode = "";
 
-    // เล่นเสียงบี๊บแจ้งเตือนเมื่อสแกนติด
     function playBeepSound() {
       try {
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
         osc.type = "sine";
-        osc.frequency.setValueAtTime(880, audioCtx.currentTime); // ความถี่เสียง 880Hz (เสียง Beep สดใส)
+        osc.frequency.setValueAtTime(880, audioCtx.currentTime);
         gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
         osc.connect(gain);
         gain.connect(audioCtx.destination);
         osc.start();
-        osc.stop(audioCtx.currentTime + 0.15); // เล่นเสียงยาว 0.15 วินาที
+        osc.stop(audioCtx.currentTime + 0.15);
       } catch (e) {
         console.log("Audio play error", e);
       }
@@ -212,7 +212,6 @@
         dispName.style.color = '#000';
         dispQty.innerText = db[code].quantity;
 
-        // ถ้าเป็นรหัสใหม่ ให้เล่นเสียงและขึ้นป็อปอัพ
         if (code !== lastScannedCode) {
           lastScannedCode = code;
           playBeepSound();
