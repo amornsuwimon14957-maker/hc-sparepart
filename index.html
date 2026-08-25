@@ -10,17 +10,15 @@
     .card { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; }
     #reader { width: 100%; border-radius: 8px; overflow: hidden; background: #000; }
     
-    /* ส่วนแสดงผลข้อมูลจากการสแกน */
     #scan-info-box { display: none; margin-top: 15px; padding: 15px; border: 2px solid #007bff; border-radius: 8px; background-color: #e7f3ff; }
     #scan-info-box h4 { margin: 0 0 10px 0; color: #007bff; }
     .info-label { font-weight: bold; color: #555; }
     .info-value { font-size: 1.1em; font-weight: bold; color: #000; }
-    .info-qty { color: #28a745; font-size: 1.3em; } /* สีเขียวสำหรับจำนวน */
+    .info-qty { color: #28a745; font-size: 1.3em; }
 
     input, button { width: 100%; padding: 12px; margin-top: 10px; box-sizing: border-box; border-radius: 4px; border: 1px solid #ccc; font-size: 1em; }
     button { background: #007bff; color: white; border: none; font-weight: bold; cursor: pointer; transition: background 0.2s; }
     button:hover { background: #0056b3; }
-    button:disabled { background: #ccc; cursor: not-allowed; }
 
     .btn-add { background: #28a745; margin-top: 20px;}
     .btn-add:hover { background: #218838; }
@@ -31,7 +29,7 @@
     
     table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.9em; }
     th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-    th { background-color: #f2f2f2; position: sticky; top: 0; }
+    th { background-color: #f2f2f2; }
     .table-container { max-height: 300px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px;}
   </style>
 </head>
@@ -41,12 +39,11 @@
     <h2>สแกนบาร์โค้ดเพื่อเบิกอะไหล่</h2>
     <div id="reader"></div>
     
-    <!-- กล่องแสดงข้อมูลอะไหล่ทันทีที่สแกนเจอ -->
     <div id="scan-info-box">
       <h4>🔍 พบข้อมูลอะไหล่:</h4>
       <p><span class="info-label">ชื่ออะไหล่:</span> <span id="info-name" class="info-value">-</span></p>
       <p><span class="info-label">จำนวนคงเหลือปัจจุบัน:</span> <span id="info-qty" class="info-value info-qty">-</span> ชิ้น</p>
-      <input type="hidden" id="barcode"> <!-- เก็บ barcode ไว้ยิง API -->
+      <input type="hidden" id="barcode">
     </div>
 
     <div id="interaction-area" style="display:none;">
@@ -74,10 +71,9 @@
     </div>
     <button class="btn-add" onclick="showAddSection()">+ เพิ่มอะไหล่ใหม่ / เติมสต็อก</button>
     
-    <!-- ส่วนเพิ่มอะไหล่ (ซ่อนไว้ก่อน) -->
     <div id="add-section" style="display:none; margin-top:20px; padding-top:20px; border-top:1px solid #eee;">
       <h4>เพิ่ม/ปรับปรุงสต็อก</h4>
-      <input type="text" id="add_barcode" placeholder="Barcode (ยิงสแกนใส่นี่ได้)">
+      <input type="text" id="add_barcode" placeholder="Barcode">
       <input type="text" id="add_name" placeholder="ชื่ออะไหล่">
       <input type="number" id="add_qty" placeholder="จำนวนที่นำเข้า" value="10">
       <button class="btn-add" style="margin-top:10px;" onclick="addPart()">บันทึกข้อมูลเข้าสต็อก</button>
@@ -85,76 +81,64 @@
   </div>
 
   <script>
-    // ข้อมูลเริ่มต้นสำหรับทดสอบ
+    // กำหนดรหัสบาร์โค้ดเริ่มต้นที่ชัดเจน ไม่ซ้ำกัน
     const defaultData = {
       "https://i.postimg.cc/NfNVZB7C/barcode.gif": { name: "หางปลา 50 sq.mm.", quantity: 10 },
-      "barcode_100sqmm": { name: "หางปลา 100 sq.mm.", quantity: 10 }
+      "LUG-100": { name: "หางปลา 100 sq.mm.", quantity: 10 }
     };
 
     function getParts() {
-      const stored = localStorage.getItem('spare_parts');
+      const stored = localStorage.getItem('spare_parts_v2'); // รีเซ็ตเพื่อดึงค่าเริ่มต้นใหม่
       if (!stored) {
-        localStorage.setItem('spare_parts', JSON.stringify(defaultData));
+        localStorage.setItem('spare_parts_v2', JSON.stringify(defaultData));
         return defaultData;
       }
       return JSON.parse(stored);
     }
 
     function saveParts(parts) {
-      localStorage.setItem('spare_parts', JSON.stringify(parts));
+      localStorage.setItem('spare_parts_v2', JSON.stringify(parts));
       renderTable();
     }
 
-    // --- ส่วนของกล้องสแกน ---
     const html5QrCode = new Html5Qrcode("reader");
-    const config = { fps: 10, qrbox: { width: 250, height: 150 } };
+    const config = { fps: 15, qrbox: { width: 250, height: 150 } };
 
     html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess)
     .catch(err => {
       console.error("Camera access error:", err);
-      // ถ้าเปิดกล้องไม่ได้ (เช่น บนคอมที่ไม่มีกล้อง) จะเปิดส่วน interaction ให้พิมพ์เองได้เพื่อทดสอบ
       document.getElementById('interaction-area').style.display = 'block';
-      document.getElementById('barcode').type = 'text'; // เปลี่ยนจาก hidden เป็น text
+      document.getElementById('barcode').type = 'text';
       document.getElementById('barcode').placeholder = 'พิมพ์บาร์โค้ดเองที่นี่เพื่อทดสอบ';
     });
 
-    // เมื่อสแกนสำเร็จ
     function onScanSuccess(decodedText) {
       const parts = getParts();
       const infoBox = document.getElementById('scan-info-box');
       const interactArea = document.getElementById('interaction-area');
       const resultBox = document.getElementById('result');
 
-      // ซ่อนผลลัพธ์เก่า
       resultBox.style.display = 'none';
-
-      // ใส่ค่า Barcode ลงใน hidden input
       document.getElementById('barcode').value = decodedText;
 
       if (parts[decodedText]) {
-        // **1. ขึ้นด้วยว่า อะไหล่ชื่ออะไร มีจำนวนเท่าไร**
         document.getElementById('info-name').innerText = parts[decodedText].name;
         document.getElementById('info-qty').innerText = parts[decodedText].quantity;
         
         infoBox.style.display = 'block';
         interactArea.style.display = 'block';
-        
-        // เลื่อนหน้าจอลงมาให้เห็นข้อมูล
         interactArea.scrollIntoView({ behavior: 'smooth' });
       } else {
-        // สแกนเจอแต่ไม่มีในระบบ
         infoBox.style.display = 'none';
         interactArea.style.display = 'none';
-        showResult(`🚫 ไม่พบรหัสบาร์โค้ด: ${decodedText} ในระบบ`, false);
+        showResult(`🚫 ไม่พบรหัสบาร์โค้ด: "${decodedText}" ในระบบ`, false);
       }
     }
 
-    // --- ฟังก์ชันเบิกอะไหล่ ---
     function withdrawPart() {
       const barcode = document.getElementById('barcode').value.trim();
       const amountInput = document.getElementById('amount');
       const amount = parseInt(amountInput.value, 10);
-      const btnWithdraw = document.getElementById('btn-withdraw');
       
       if (!barcode || isNaN(amount) || amount <= 0) {
         return showResult('⚠️ กรุณาระบุจำนวนที่ต้องการเบิกให้ถูกต้อง', false);
@@ -171,25 +155,16 @@
         return showResult(`❌ สต็อกไม่พอ! มีอยู่ ${part.quantity} ต้องการเบิก ${amount}`, false);
       }
 
-      // ทำการตัดยอด
-      const oldQty = part.quantity;
       part.quantity -= amount;
       const newQty = part.quantity;
 
-      // บันทึกข้อมูล
       saveParts(parts);
 
-      // **2. กดยืนยันเบิกแล้วเหลือจำนวนเท่าไร**
       showResult(`✅ เบิกสำเร็จ! ${part.name} จำนวน ${amount} ชิ้น<br>คงเหลือใหม่: ${newQty} ชิ้น`, true);
-
-      // อัปเดตการแสดงผลในกล่องข้อมูลสีฟ้าด้วย
       document.getElementById('info-qty').innerText = newQty;
-
-      // รีเซ็ตจำนวนเบิกกลับเป็น 1
       amountInput.value = 1;
     }
 
-    // --- ฟังก์ชันจัดการสต็อก (ส่วนล่าง) ---
     function addPart() {
       const barcode = document.getElementById('add_barcode').value.trim();
       const name = document.getElementById('add_name').value.trim();
@@ -203,7 +178,7 @@
       let parts = getParts();
       if (parts[barcode]) {
         parts[barcode].quantity += qty;
-        parts[barcode].name = name; // อัปเดตชื่อด้วยถ้ามีการเปลี่ยนแปลง
+        parts[barcode].name = name;
       } else {
         parts[barcode] = { name: name, quantity: qty };
       }
@@ -211,30 +186,21 @@
       saveParts(parts);
       alert(`✅ บันทึกสต็อกสำเร็จ: ${name}`);
       
-      // ล้างค่าอินพุต
       document.getElementById('add_barcode').value = '';
       document.getElementById('add_name').value = '';
       qtyInput.value = '10';
-      
-      // ถ้าเปิดกล้องอยู่ ให้ UI สแกนอัปเดตถ้าบาร์โค้ดตรงกัน
-      const currentScanBarcode = document.getElementById('barcode').value;
-      if(currentScanBarcode === barcode) {
-        document.getElementById('info-qty').innerText = parts[barcode].quantity;
-      }
     }
 
     function showAddSection() {
       const section = document.getElementById('add-section');
       section.style.display = section.style.display === 'none' ? 'block' : 'none';
-      if(section.style.display === 'block') section.scrollIntoView({ behavior: 'smooth' });
     }
 
-    // --- ฟังก์ชันทั่วไป ---
     function showResult(msg, isSuccess) {
       const box = document.getElementById('result');
       box.style.display = 'block';
       box.className = isSuccess ? 'success' : 'error';
-      box.innerHTML = msg; // ใช้ innerHTML เพื่อรองรับ <br>
+      box.innerHTML = msg;
     }
 
     function renderTable() {
@@ -242,24 +208,16 @@
       const tbody = document.querySelector('#stockTable tbody');
       tbody.innerHTML = '';
       
-      // แปลง object เป็น array เพื่อเรียงลำดับ (ถ้าต้องการ)
       const sortedKeys = Object.keys(parts).sort();
-
-      if (sortedKeys.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;">=== ไม่มีอะไหล่ในสต็อก ===</td></tr>';
-        return;
-      }
 
       for (let code of sortedKeys) {
         const tr = document.createElement('tr');
-        // ตัด Barcode ให้สั้นลงถ้ามันยาวไป (เช่น ลิงก์รูป)
-        const displayCode = code.length > 25 ? code.substring(0, 22) + '...' : code;
+        const displayCode = code.length > 20 ? code.substring(0, 17) + '...' : code;
         tr.innerHTML = `<td title="${code}">${displayCode}</td><td>${parts[code].name}</td><td>${parts[code].quantity}</td>`;
         tbody.appendChild(tr);
       }
     }
 
-    // แสดงตารางเมื่อโหลดหน้า
     renderTable();
   </script>
 </body>
