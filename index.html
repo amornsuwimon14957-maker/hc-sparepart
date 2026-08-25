@@ -61,9 +61,19 @@
   </div>
 
   <script>
-    // ดึงข้อมูลจาก localStorage
+    // ข้อมูลเริ่มต้นสำหรับทดสอบระบบ
+    const defaultData = {
+      "https://i.postimg.cc/NfNVZB7C/barcode.gif": { name: "หางปลา 50 sq.mm.", quantity: 10 },
+      "barcode_100sqmm": { name: "หางปลา 100 sq.mm.", quantity: 10 }
+    };
+
     function getParts() {
-      return JSON.parse(localStorage.getItem('spare_parts') || '{}');
+      const stored = localStorage.getItem('spare_parts');
+      if (!stored) {
+        localStorage.setItem('spare_parts', JSON.stringify(defaultData));
+        return defaultData;
+      }
+      return JSON.parse(stored);
     }
 
     function saveParts(parts) {
@@ -71,7 +81,7 @@
       renderTable();
     }
 
-    // เริ่มทำงานกล้องสแกนบาร์โค้ด
+    // เปิดใช้งานกล้องสแกน
     const html5QrCode = new Html5Qrcode("reader");
     html5QrCode.start(
       { facingMode: "environment" },
@@ -81,7 +91,7 @@
       }
     ).catch(err => console.log("Camera error or not HTTPS"));
 
-    // ตัดยอดเบิก
+    // ฟังก์ชันตัดยอดเบิก
     function withdrawPart() {
       const barcode = document.getElementById('barcode').value.trim();
       const amount = parseInt(document.getElementById('amount').value, 10);
@@ -105,7 +115,7 @@
       showResult(`ตัดยอดสำเร็จ! (${parts[barcode].name}) คงเหลือ: ${parts[barcode].quantity}`, true);
     }
 
-    // เพิ่มสต็อก
+    // ฟังก์ชันเพิ่มสต็อก
     function addPart() {
       const barcode = document.getElementById('add_barcode').value.trim();
       const name = document.getElementById('add_name').value.trim();
@@ -147,7 +157,7 @@
       }
     }
 
-    // โหลดตารางเมื่อเปิดหน้าเว็บ
+    // แสดงตารางเมื่อโหลดหน้า
     renderTable();
   </script>
 </body>
