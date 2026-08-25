@@ -6,7 +6,7 @@
   <title>ระบบเบิก Spare Part</title>
   <script src="https://unpkg.com/html5-qrcode"></script>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 15px; background: #f0f2f5; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 650px; margin: 0 auto; padding: 15px; background: #f0f2f5; }
     .card { background: #fff; padding: 18px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); margin-bottom: 15px; }
     #reader { width: 100%; border-radius: 8px; overflow: hidden; background: #000; min-height: 200px; }
     
@@ -22,14 +22,16 @@
     .btn-quick { background: #6c757d; font-size: 0.85em; padding: 8px; margin-top: 5px; width: 48%; display: inline-block; }
     .btn-withdraw { background: #28a745; font-size: 1.1em; margin-top: 15px; }
     .btn-reset { background: #dc3545; font-size: 0.85em; padding: 8px; margin-top: 15px; }
+    .btn-clear-history { background: #ffc107; color: #000; font-size: 0.85em; padding: 6px; margin-top: 10px; }
     
     #result { padding: 12px; border-radius: 6px; margin-top: 15px; display: none; font-weight: bold; text-align: center; }
     .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
     .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
     
-    table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9em; }
-    th, td { border: 1px solid #eee; padding: 10px; text-align: left; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.88em; }
+    th, td { border: 1px solid #eee; padding: 8px; text-align: left; }
     th { background-color: #f8f9fa; }
+    .table-container { max-height: 220px; overflow-y: auto; border: 1px solid #eee; border-radius: 6px; }
   </style>
 </head>
 <body>
@@ -39,12 +41,12 @@
     <div id="reader"></div>
     
     <div style="margin-top: 10px;">
-      <small style="color: #666;">ทดสอบด่วนโดยไม่ต้องสแกน:</small><br>
-      <button class="btn-quick" onclick="testCode('HC-0001')">ทดสอบ HC-0001</button>
-      <button class="btn-quick" onclick="testCode('HC-0002')">ทดสอบ HC-0002</button>
+      <small style="color: #666;">ทดสอบเลือกอะไหล่:</small><br>
+      <button class="btn-quick" onclick="testCode('HC-0001')">HC-0001 (50 sq.mm.)</button>
+      <button class="btn-quick" onclick="testCode('HC-0002')">HC-0002 (100 sq.mm.)</button>
     </div>
 
-    <label style="margin-top:15px; display:block; font-weight:bold;">Barcode รหัสอะไหล่:</label>
+    <label style="margin-top:15px; display:block; font-weight:bold;">1. Barcode รหัสอะไหล่:</label>
     <input type="text" id="barcode" placeholder="พิมพ์รหัส เช่น HC-0001" onkeyup="onBarcodeChange()" onchange="onBarcodeChange()">
 
     <div class="info-box">
@@ -53,8 +55,12 @@
       <div class="info-item"><b>คงเหลือก่อนเบิก:</b> <span id="disp-qty" class="qty-badge">-</span> ชิ้น</div>
     </div>
 
-    <label style="margin-top:15px; display:block; font-weight:bold;">จำนวนที่ต้องการเบิก:</label>
+    <label style="margin-top:15px; display:block; font-weight:bold;">2. ชื่อผู้ขอเบิก:</label>
+    <input type="text" id="requester" placeholder="ระบุชื่อผู้เบิก (เช่น ช่างสมชาย)">
+
+    <label style="margin-top:10px; display:block; font-weight:bold;">3. จำนวนที่ต้องการเบิก:</label>
     <input type="number" id="amount" value="1" min="1">
+
     <button class="btn-withdraw" onclick="doWithdraw()">✅ ยืนยันการตัดยอดเบิก</button>
     
     <div id="result"></div>
@@ -62,18 +68,37 @@
 
   <div class="card">
     <h3 style="margin-top:0;">📊 คลังสินค้าปัจจุบัน</h3>
-    <table>
-      <thead>
-        <tr>
-          <th>Barcode</th>
-          <th>รายการ</th>
-          <th>คงเหลือ</th>
-        </tr>
-      </thead>
-      <tbody id="stockBody"></tbody>
-    </table>
-    
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Barcode</th>
+            <th>รายการ</th>
+            <th>คงเหลือ</th>
+          </tr>
+        </thead>
+        <tbody id="stockBody"></tbody>
+      </table>
+    </div>
     <button class="btn-reset" onclick="forceResetData()">🔄 รีเซ็ตสต็อกทั้งหมด</button>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-top:0;">📜 ประวัติการเบิกอะไหล่</h3>
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>วัน-เวลา</th>
+            <th>ผู้เบิก</th>
+            <th>รายการ</th>
+            <th>จำนวน</th>
+          </tr>
+        </thead>
+        <tbody id="historyBody"></tbody>
+      </table>
+    </div>
+    <button class="btn-clear-history" onclick="clearHistory()">🧹 ล้างประวัติการเบิก</button>
   </div>
 
   <script>
@@ -82,7 +107,8 @@
       "HC-0002": { name: "หางปลา 100 sq.mm.", quantity: 10 }
     };
 
-    const DB_KEY = 'SPARE_PARTS_DB_V7';
+    const DB_KEY = 'SPARE_PARTS_DB_V8';
+    const LOG_KEY = 'SPARE_PARTS_LOG_V8';
 
     function loadDB() {
       let data = localStorage.getItem(DB_KEY);
@@ -95,15 +121,34 @@
 
     function saveDB(data) {
       localStorage.setItem(DB_KEY, JSON.stringify(data));
-      renderTable();
+      renderStockTable();
+    }
+
+    function loadHistory() {
+      let data = localStorage.getItem(LOG_KEY);
+      return data ? JSON.parse(data) : [];
+    }
+
+    function saveHistory(history) {
+      localStorage.setItem(LOG_KEY, JSON.stringify(history));
+      renderHistoryTable();
     }
 
     function forceResetData() {
-      localStorage.removeItem(DB_KEY);
-      localStorage.setItem(DB_KEY, JSON.stringify(INITIAL_STOCK));
-      renderTable();
-      onBarcodeChange();
-      alert("รีเซ็ตคลังสินค้าเป็นค่าเริ่มต้นเรียบร้อยแล้ว!");
+      if(confirm("ต้องการรีเซ็ตจำนวนสต็อกกลับเป็นค่าเริ่มต้นหรือไม่?")) {
+        localStorage.removeItem(DB_KEY);
+        localStorage.setItem(DB_KEY, JSON.stringify(INITIAL_STOCK));
+        renderStockTable();
+        onBarcodeChange();
+        alert("รีเซ็ตคลังสินค้าเรียบร้อยแล้ว!");
+      }
+    }
+
+    function clearHistory() {
+      if(confirm("ต้องการล้างประวัติการเบิกทั้งหมดหรือไม่?")) {
+        localStorage.removeItem(LOG_KEY);
+        renderHistoryTable();
+      }
     }
 
     function testCode(code) {
@@ -132,20 +177,36 @@
 
     function doWithdraw() {
       const code = document.getElementById('barcode').value.trim();
+      const requester = document.getElementById('requester').value.trim();
       const qtyInput = document.getElementById('amount');
       const withdrawQty = parseInt(qtyInput.value, 10);
 
       if (!code) return showResult('⚠️ กรุณาสแกนหรือกรอกรหัสบาร์โค้ด', false);
+      if (!requester) return showResult('⚠️ กรุณาระบุชื่อผู้ขอเบิก', false);
       if (isNaN(withdrawQty) || withdrawQty <= 0) return showResult('⚠️ กรุณาระบุจำนวนที่เบิกให้ถูกต้อง', false);
 
       let db = loadDB();
       if (!db[code]) return showResult(`🚫 ไม่พบรหัสบาร์โค้ด "${code}" ในระบบ`, false);
       if (db[code].quantity < withdrawQty) return showResult(`❌ สินค้าไม่พอ! คงเหลือเพียง ${db[code].quantity} ชิ้น`, false);
 
+      // 1. ตัดสต็อก
       db[code].quantity -= withdrawQty;
       saveDB(db);
 
-      showResult(`✅ ตัดยอดสำเร็จ!<br>${db[code].name}<br>เบิกออก: ${withdrawQty} ชิ้น | <b>คงเหลือใหม่: ${db[code].quantity} ชิ้น</b>`, true);
+      // 2. บันทึกประวัติ (Log)
+      const history = loadHistory();
+      const now = new Date();
+      const timeStr = `${now.getDate()}/${now.getMonth()+1}/${now.getFullYear()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+      
+      history.unshift({
+        time: timeStr,
+        name: requester,
+        item: db[code].name,
+        qty: withdrawQty
+      });
+      saveHistory(history);
+
+      showResult(`✅ ตัดยอดสำเร็จ!<br>ผู้เบิก: <b>${requester}</b><br>${db[code].name} (${withdrawQty} ชิ้น)<br><b>คงเหลือใหม่: ${db[code].quantity} ชิ้น</b>`, true);
       document.getElementById('disp-qty').innerText = db[code].quantity;
       qtyInput.value = 1;
     }
@@ -157,13 +218,28 @@
       box.innerHTML = msg;
     }
 
-    function renderTable() {
+    function renderStockTable() {
       const db = loadDB();
       const tbody = document.getElementById('stockBody');
       tbody.innerHTML = '';
       for (let k in db) {
         tbody.innerHTML += `<tr><td><b>${k}</b></td><td>${db[k].name}</td><td>${db[k].quantity}</td></tr>`;
       }
+    }
+
+    function renderHistoryTable() {
+      const history = loadHistory();
+      const tbody = document.getElementById('historyBody');
+      tbody.innerHTML = '';
+      
+      if (history.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#888;">ยังไม่มีประวัติการเบิก</td></tr>';
+        return;
+      }
+
+      history.forEach(row => {
+        tbody.innerHTML += `<tr><td>${row.time}</td><td><b>${row.name}</b></td><td>${row.item}</td><td>${row.qty}</td></tr>`;
+      });
     }
 
     try {
@@ -178,7 +254,8 @@
       ).catch(e => console.log("Camera inactive"));
     } catch(e) {}
 
-    renderTable();
+    renderStockTable();
+    renderHistoryTable();
   </script>
 </body>
 </html>
